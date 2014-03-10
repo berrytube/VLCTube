@@ -15,7 +15,7 @@ module.exports = {
         var options = {
             host: 'player.vimeo.com',
             path: '/video/' + id,
-            port: 443,
+            port: 80,
             headers: {
                 'User-Agent': 'Mozilla/5.0',
                 'Referer': 'player.vimeo.com'
@@ -40,11 +40,11 @@ module.exports = {
                 var files = json.request.files[codec];
                 if (qual in files) {
                     setImmediate(function () {
-                        cb(files[qual]);
+                        cb(files[qual].url);
                     });
                 } else {
                     setImmediate(function () {
-                        cb(files.sd);
+                        cb(files.sd.url);
                     });
                 }
             } catch (e) {
