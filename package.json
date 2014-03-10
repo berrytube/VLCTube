@@ -1,0 +1,12 @@
+{
+  "author": "cyzon",
+  "name": "VLCTube",
+  "description": "VLC video client for BerryTube",
+  "version": "1.0.0",
+  "repository": {
+    "url": "http://github.com/berrytube/VLCTube"
+  },
+  "dependencies": {
+    "socket.io-client": "^0.9.16"
+  }
+}
