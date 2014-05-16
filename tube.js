@@ -1,5 +1,5 @@
 var io = require('socket.io-client');
-var socket = io.connect('96.127.152.99:8344');
+var socket = io.connect('btc.berrytube.tv:8344');
 var links = require('./links');
 
 var newVideoListeners = [];
