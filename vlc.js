@@ -1,21 +1,44 @@
 var spawn = require('child_process').spawn;
+var connect = require('net').connect;
+var existsSync = require('fs').existsSync;
 
-function VLCPlayer(link) {
-    var args = ['--extraintf', 'rc'];
-    if (link != null) {
-        args.unshift(link);
+function VLCPlayer(executable, port) {
+    if ( !executable ){
+        executable = 'vlc';
+        if ( process.platform == 'win32' ){
+            [
+                'C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe',
+                'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe'
+            ].forEach(function(path){
+                if ( existsSync(path) ){
+                    executable = path;
+                }
+            });
+        }
     }
 
-    this.vlc = spawn('vlc', args);
-    this.vlc.stdout.on('data', this.handleStdout.bind(this));
-    this.vlc.stderr.on('data', this.handleStderr.bind(this));
-    this.vlc.on('close', this.handleClose.bind(this));
+    if ( !port ){
+        port = 7564;
+    }
+
+    spawn(
+        executable,
+        ['--extraintf', 'rc', '--rc-quiet', '--rc-host', 'localhost:' + port],
+        {'stdio': 'ignore'}
+    );
+
+    this.sock = connect({
+        'host': 'localhost',
+        'port': port
+    })
+    this.sock.on('data', this.handleData.bind(this));
+    this.sock.on('end', this.handleEnd.bind(this));
 
     this.waiting = [];
 }
 
 VLCPlayer.prototype = {
-    handleStdout: function (data) {
+    handleData: function (data) {
         data = (data+'').trim('\n');
         if (data.trim() !== '>') {
             console.log(data);
@@ -29,53 +52,48 @@ VLCPlayer.prototype = {
         }
     },
 
-    handleStderr: function (data) {
-        data = (data+'').trim('\n');
-        console.error(data);
-    },
-
-    handleClose: function (code) {
-        console.log('VLC process exited with code', code);
-        this.vlc = null;
+    handleEnd: function(){
+        console.log('socket ended');
+        this.sock = null;
     },
 
     play: function () {
-        if (!this.vlc) {
+        if (!this.sock) {
             return;
         }
 
-        this.vlc.stdin.write('play\n');
+        this.sock.write('play\n');
     },
 
     pause: function () {
-        if (!this.vlc) {
+        if (!this.sock) {
             return;
         }
 
-        this.vlc.stdin.write('pause\n');
+        this.sock.write('pause\n');
     },
 
     getTime: function (cb) {
-        this.vlc.stdin.write('get_time\n');
+        this.sock.write('get_time\n');
         this.waiting.push(function (data) {
             cb(parseInt(data));
         });
     },
 
     seek: function (to) {
-        if (!this.vlc) {
+        if (!this.sock) {
             return;
         }
 
-        this.vlc.stdin.write('seek ' + to + '\n');
+        this.sock.write('seek ' + to + '\n');
     },
 
     load: function (link) {
-        if (!this.vlc) {
+        if (!this.sock) {
             return;
         }
 
-        this.vlc.stdin.write('clear\nadd ' + link + '\n');
+        this.sock.write('clear\nadd ' + link + '\n');
     }
 };
 
