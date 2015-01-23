@@ -2,7 +2,7 @@ var VLCPlayer = require('./vlc');
 var tube = require('./tube');
 var SYNC_ACCURACY = 2;
 
-var vlc = new VLCPlayer();
+var vlc = new VLCPlayer(process.argv[2], process.argv[3]);
 
 tube.onVideoChange(function (link, time) {
     vlc.load(link);
