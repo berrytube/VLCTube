@@ -2,37 +2,52 @@ var spawn = require('child_process').spawn;
 var connect = require('net').connect;
 var existsSync = require('fs').existsSync;
 
-function VLCPlayer(executable, port) {
-    if ( !executable ){
+var WINDOWS_VLC = [
+    'C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe',
+    'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe'
+];
+
+function VLCPlayer(executable, port, readyCallback) {
+    if (!executable) {
         executable = 'vlc';
-        if ( process.platform == 'win32' ){
-            [
-                'C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe',
-                'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe'
-            ].forEach(function(path){
-                if ( existsSync(path) ){
+        if (process.platform == 'win32'){
+            WINDOWS_VLC.forEach(function (path) {
+                if (existsSync(path)){
                     executable = path;
                 }
             });
         }
     }
 
-    if ( !port ){
+    if (!port){
         port = 7564;
     }
 
-    spawn(
-        executable,
-        ['--extraintf', 'rc', '--rc-quiet', '--rc-host', 'localhost:' + port],
-        {'stdio': 'ignore'}
+    spawn(executable,
+        ['--extraintf', 'rc', '--rc-host', 'localhost:' + port],
+        { stdio: 'ignore' }
     );
 
-    this.sock = connect({
-        'host': 'localhost',
-        'port': port
-    })
-    this.sock.on('data', this.handleData.bind(this));
-    this.sock.on('end', this.handleEnd.bind(this));
+    this.initialized = false;
+    var self = this;
+    var warmup = setInterval(function () {
+        self.sock = connect({ port: port }, function () {
+            clearInterval(warmup);
+            self.sock.on('data', self.handleData.bind(self));
+            self.sock.on('end', self.handleEnd.bind(self));
+            if (readyCallback) {
+                readyCallback();
+            }
+        });
+
+        self.sock.on('error', function (error) {
+            if (!self.initialized) {
+                self.sock.destroy();
+            } else {
+                console.error('Socket error: ' + error);
+            }
+        });
+    }, 500);
 
     this.waiting = [];
 }
@@ -43,7 +58,7 @@ VLCPlayer.prototype = {
         if (data.trim() !== '>') {
             console.log(data);
         }
-        
+
         if (this.waiting.length > 0) {
             var fn = this.waiting.shift();
             setImmediate(function () {
@@ -54,7 +69,7 @@ VLCPlayer.prototype = {
 
     handleEnd: function(){
         console.log('socket ended');
-        this.sock = null;
+        process.exit(0);
     },
 
     play: function () {
@@ -83,6 +98,13 @@ VLCPlayer.prototype = {
     seek: function (to) {
         if (!this.sock) {
             return;
+        }
+
+        if (to < 0) {
+            this.pause();
+            return;
+        } else {
+            this.play();
         }
 
         this.sock.write('seek ' + to + '\n');
